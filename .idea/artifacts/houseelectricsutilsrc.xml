@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="houseelectricsutilsrc">
+    <output-path>$PROJECT_DIR$/out/artifacts/houseelectricsutilsrc</output-path>
+    <root id="archive" name="houseelectricsutilsrc.jar">
+      <element id="dir-copy" path="$PROJECT_DIR$/src" />
+    </root>
+  </artifact>
+</component>
