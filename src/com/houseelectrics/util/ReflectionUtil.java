@@ -368,19 +368,20 @@ public interface DeepCompareListener
    return diffsDetected;
 }
 
-
+    public final static DeepComparePropertyReferenceDetector defaultDeepComparePropertyReferenceDetector =
+    new DeepComparePropertyReferenceDetector()
+    {
+      @Override
+    public boolean isReference(Class type)
+    {
+        return !type.isPrimitive() && !Number.class.isAssignableFrom(type) && type!=String.class && type!=Boolean.class
+                && type!=Character.class && type!=Byte.class;
+    }
+};
     public static boolean deepCompareViaReadWriteableProperties(Object o1, Object o2,
                                                                 DeepCompareListener deepComparisonListener) throws Exception
     {
-        DeepComparePropertyReferenceDetector propertyReferenceDetector = new DeepComparePropertyReferenceDetector()
-        {
-            @Override
-            public boolean isReference(Class type)
-            {
-                return !type.isPrimitive() && !Number.class.isAssignableFrom(type) && type!=String.class && type!=Boolean.class
-                        && type!=Character.class && type!=Byte.class;
-            }
-        };
+        DeepComparePropertyReferenceDetector propertyReferenceDetector = defaultDeepComparePropertyReferenceDetector;
 
         return deepCompareViaReadWriteableProperties( o1,  o2,
                  null,  propertyReferenceDetector,
@@ -493,6 +494,69 @@ private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o
     return overallMatch;
 
 }
+    public static Object deepCloneViaReadWriteableProperties(Object o1)
+            throws InstantiationException, IllegalAccessException, InvocationTargetException
+    {
+        return deepCloneViaReadWriteableProperties(o1, defaultDeepComparePropertyReferenceDetector);
+    }
 
+
+    //the second parameter should maybe be a test for finality ?
+    public static Object deepCloneViaReadWriteableProperties(Object o1, DeepComparePropertyReferenceDetector deepComparePropertyReferenceDetector)
+            throws InstantiationException, IllegalAccessException, InvocationTargetException
+    {
+        if (o1==null  )
+        {
+            return null;
+        }
+        boolean isList = List.class.isAssignableFrom(o1.getClass());
+        boolean isMap = Map.class.isAssignableFrom(o1.getClass());
+        boolean isReference = defaultDeepComparePropertyReferenceDetector.isReference(o1.getClass());
+
+        Object result;
+        if (isMap)
+        {
+            //deepComparisonListener.differenceDetected (o1, o2, parentNameStack, "map types always assumed to be different");
+            Map map1 = (Map) o1;
+            Map map2 = (Map) o1.getClass().newInstance();
+            for (Object key : map1.keySet())
+            {
+                Object mapItem = map1.get(key);
+                // assume the keys are immutable !
+                mapItem = deepCloneViaReadWriteableProperties(mapItem, deepComparePropertyReferenceDetector);
+                map2.put(key, mapItem);
+            }
+            result = map2;
+        }
+        else if (isList)
+        {
+            List list1 = (List)o1;
+            List list2 = (List) o1.getClass().newInstance();
+            for (int done=0; done<list1.size(); done++)
+                {
+                    Object listItem = list1.get(done);
+                    listItem = deepCloneViaReadWriteableProperties(listItem, deepComparePropertyReferenceDetector);
+                    list2.add(listItem);
+                }
+            result =  list2;
+        }
+        else if (!isReference)
+        {
+            result = o1;
+        }
+        else
+        {
+            result = o1.getClass().newInstance();
+            List<PropertyReference> propertyReferences = getPublicReadWriteableProperties(o1.getClass());
+            for (int done = 0; done < propertyReferences.size(); done++)
+            {
+                PropertyReference propertyReference = propertyReferences.get(done);
+                Object subObject = propertyReference.get(o1);
+                subObject = deepCloneViaReadWriteableProperties(subObject, deepComparePropertyReferenceDetector);
+                propertyReference.set(result, subObject);
+            }
+        }
+        return result;
+    }
 
 }

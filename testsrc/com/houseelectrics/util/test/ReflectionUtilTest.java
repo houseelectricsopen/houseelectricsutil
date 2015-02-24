@@ -1,6 +1,7 @@
 package com.houseelectrics.util.test;
 
 import com.houseelectrics.util.ReflectionUtil;
+import javafx.scene.effect.Reflection;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -232,7 +233,65 @@ public class ReflectionUtilTest
         Assert.assertEquals(2, diffs.size());
         Assert.assertEquals(diffs.get(0).propertyPath, "MapField.two");
         Assert.assertEquals(diffs.get(1).propertyPath, "MapField.3");
+    }
 
+    public static class CloneTestObject
+    {
+        private String name;
+        public String getName() {return name;}
+        public void setName(String value) {this.name = value;}
+
+        private MapContainerTestClass mapContainer;
+        public MapContainerTestClass getMapContainer() {return mapContainer;}
+        public void setMapContainer(MapContainerTestClass value) {this.mapContainer=value;}
+
+        private TestMaster testMaster;
+        public TestMaster getTestMaster() {return testMaster;}
+        public void setTestMaster(TestMaster value) {this.testMaster=value;}
+
+    }
+
+    @Test
+    public void testDeepClone() throws Exception
+    {
+        CloneTestObject root = new CloneTestObject();
+        MapContainerTestClass mapContainer = new MapContainerTestClass();
+        root.setMapContainer(mapContainer);
+        Map theMap = new HashMap();
+        mapContainer.setMapField(theMap);
+        theMap.put("one", 1);
+        theMap.put(2, "two");
+        TestMaster testMaster = new TestMaster();
+        root.setTestMaster(testMaster);
+        List<TestDetail> testDetails = new ArrayList<TestDetail>();
+        testMaster.setDetails(testDetails);
+        TestDetail testDetail;
+        testDetail = new TestDetail();
+        testDetails.add(testDetail);
+        testDetail.setId(123);
+        testDetail.setDetailName("detail3");
+        testDetail = new TestDetail();
+        testDetails.add(testDetail);
+        testDetail.setId(124);
+        testDetail.setDetailName("detail4");
+
+        CloneTestObject clonedRoot = (CloneTestObject) ReflectionUtil.deepCloneViaReadWriteableProperties(root);
+        List<ReflectionUtil.DeepCompareDifference> diffs = ReflectionUtil.deepCompareViaReadWriteableProperties(root, clonedRoot);
+        for (int done=0; done<diffs.size(); done++)
+        {
+           ReflectionUtil.DeepCompareDifference diff = diffs.get(done);
+           System.out.println("diff: " + diff.propertyPath + " " + diff.propertyPath);
+        }
+        Assert.assertEquals("object and cloned object should match ", diffs.size(), 0 );
+        Assert.assertTrue(root!=clonedRoot);
+        Assert.assertTrue(root.getMapContainer()!=clonedRoot.getMapContainer());
+        Assert.assertTrue(root.getTestMaster()!=clonedRoot.getTestMaster());
+        List<TestDetail> clonedTestDetails = clonedRoot.getTestMaster().getDetails();
+        Assert.assertTrue(testDetails!=clonedTestDetails);
+        for (int done=0; done<testDetails.size(); done++)
+        {
+            Assert.assertTrue(testDetails.get(done)!=clonedTestDetails.get(done));
+        }
 
     }
 
