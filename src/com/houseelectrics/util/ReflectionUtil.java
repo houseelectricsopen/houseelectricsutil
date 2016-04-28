@@ -8,7 +8,7 @@ import java.util.*;
  */
 public class ReflectionUtil
 {
-    public static interface ObjectCreator
+   public static interface ObjectCreator
     {
         public Object newInstance(Object parentContext, String propertyName, Class theClass);
     }
@@ -346,10 +346,20 @@ public interface DeepCompareListener
     }
 
 
+    public static List<DeepCompareDifference> deepCompareViaReadWriteablePropertiesIgnoreTypeDifferences(Object o1, Object o2) throws Exception
+    {
+        return deepCompareViaReadWriteableProperties(o1, o2, true);
+    }
+
     public static List<DeepCompareDifference> deepCompareViaReadWriteableProperties(Object o1, Object o2) throws Exception
+    {
+        return deepCompareViaReadWriteableProperties(o1, o2, false);
+    }
+
+    private static List<DeepCompareDifference> deepCompareViaReadWriteableProperties(Object o1, Object o2, boolean ignoreTypeDifferences) throws Exception
 {
     final List<DeepCompareDifference> diffsDetected = new ArrayList<DeepCompareDifference>();
-    DeepCompareListener deepCompareListener = new DeepCompareListener()
+    DeepCompareListener deepComparisonListener = new DeepCompareListener()
     {
         @Override
         public void differenceDetected(Object o1, Object o2, Stack<String> parentNameStack, String description)
@@ -364,7 +374,9 @@ public interface DeepCompareListener
             diffsDetected.add(diff);
         }
     };
-    deepCompareViaReadWriteableProperties( o1,  o2, deepCompareListener);
+    deepCompareViaReadWriteableProperties( o1,  o2,
+            null,  defaultDeepComparePropertyReferenceDetector,
+            deepComparisonListener, ignoreTypeDifferences);
    return diffsDetected;
 }
 
@@ -385,13 +397,16 @@ public interface DeepCompareListener
 
         return deepCompareViaReadWriteableProperties( o1,  o2,
                  null,  propertyReferenceDetector,
-                 deepComparisonListener);
+                 deepComparisonListener, false);
 
     }
-//TODO check for loops
+
+
+
+    //TODO check for loops
 private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o2,
                                                             Stack<String> parentNameStack, DeepComparePropertyReferenceDetector propertyReferenceDetector,
-                                                            DeepCompareListener deepComparisonListener)
+                                                            DeepCompareListener deepComparisonListener, boolean ignoreTypeDifferences)
         throws Exception
 {
     if (parentNameStack==null) {         parentNameStack = new Stack<String>();   }
@@ -401,7 +416,7 @@ private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o
             deepComparisonListener.differenceDetected (o1, o2, parentNameStack, "different values:" + o1 +"," + o2);
             return false;
         }
-    if (o1.getClass()!=o2.getClass())
+    if (o1.getClass()!=o2.getClass() && !ignoreTypeDifferences)
     {
         deepComparisonListener.differenceDetected (o1, o2, parentNameStack, "different types:" + o1.getClass().getName() + "," + o2.getClass().getName());
         return false;
@@ -429,7 +444,7 @@ private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o
             {
                 Object mapValue1 = map1.get(key);
                 Object mapValue2 = map2.get(key);
-                boolean match = deepCompareViaReadWriteableProperties(mapValue1, mapValue2,  parentNameStack, propertyReferenceDetector,deepComparisonListener);
+                boolean match = deepCompareViaReadWriteableProperties(mapValue1, mapValue2,  parentNameStack, propertyReferenceDetector,deepComparisonListener, ignoreTypeDifferences);
                 if (!match) overallMatch=false;
             }
             parentNameStack.pop();
@@ -458,7 +473,7 @@ private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o
         for (int done=0; done<list1.size(); done++)
         {
             parentNameStack.push(""+done);
-            boolean match = deepCompareViaReadWriteableProperties(list1.get(done), list2.get(done),  parentNameStack, propertyReferenceDetector,deepComparisonListener);
+            boolean match = deepCompareViaReadWriteableProperties(list1.get(done), list2.get(done),  parentNameStack, propertyReferenceDetector,deepComparisonListener, ignoreTypeDifferences);
             parentNameStack.pop();
             if (!match) overallMatch=false;
         }
@@ -478,11 +493,16 @@ private static boolean deepCompareViaReadWriteableProperties(Object o1, Object o
         for (int done = 0; done < propertyReferences.size(); done++)
         {
             PropertyReference propertyReference = propertyReferences.get(done);
+            PropertyReference propertyReference2 = propertyReference;
             Object sub1 = propertyReference.get(o1);
-            Object sub2 = propertyReference.get(o2);
+            if (ignoreTypeDifferences && o1.getClass()!=o2.getClass())
+            {
+                propertyReference2 = getPropertyReferenceForKeyPathWithIndexes(o2, propertyReference.getPropertyName(), true, true, null);
+            }
+            Object sub2 = propertyReference2.get(o2);
             boolean match;
             parentNameStack.push(propertyReference.getPropertyName());
-            match = deepCompareViaReadWriteableProperties(sub1, sub2,  parentNameStack,propertyReferenceDetector, deepComparisonListener);
+            match = deepCompareViaReadWriteableProperties(sub1, sub2,  parentNameStack,propertyReferenceDetector, deepComparisonListener, ignoreTypeDifferences);
             if (!match)
             {
                 overallMatch = false;
