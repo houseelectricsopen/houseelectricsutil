@@ -6,10 +6,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by roberttodd on 03/12/2014.
@@ -103,7 +100,6 @@ public class ReflectionUtilTest
         Assert.assertEquals("checking detail type", List.class, reference.getType());
         Assert.assertEquals("checking generic type", TestDetail.class, reference.getParametrisedTypes()[0]);
 
-
     }
 
     @Test
@@ -146,11 +142,50 @@ public class ReflectionUtilTest
        Class theClass = TestMaster.class;
        List<ReflectionUtil.PropertyReference> refs =  ReflectionUtil.getPublicReadWriteableProperties(theClass);
        Assert.assertEquals("should be 1 ref in " + theClass.getName(), refs.size(), 2);
-       ReflectionUtil.PropertyReference ref = refs.get(0);
+       Comparator<ReflectionUtil.PropertyReference> comparator = new Comparator<ReflectionUtil.PropertyReference>()
+       {
+           @Override
+           public int compare(ReflectionUtil.PropertyReference o1, ReflectionUtil.PropertyReference o2)
+           {
+               return o1.getPropertyName().compareTo(o2.getPropertyName());
+           };
+       };
+       Collections.sort(refs, comparator);
+        ReflectionUtil.PropertyReference ref = refs.get(0);
        Assert.assertEquals(ref.getPropertyName(), "Detail");
        Assert.assertEquals(ref.getGetterMethod().getName(), "getDetail");
        Assert.assertEquals(ref.getGetterMethod().getReturnType(), TestDetail.class);
        Assert.assertEquals(ref.getSetterMethod().getName(), "setDetail");
+
+    }
+
+    public static class TestDetailSub
+    {
+        private String _detailName;
+        public String getDetailName() {return _detailName;}
+        public void setDetailName(String value) {this._detailName=value;}
+
+        private int _id;
+        public int getId() {return _id;}
+        public void setId(int value) {this._id = value;}
+    }
+
+    @Test
+    public void testDiffIgnoreType() throws Exception
+    {
+        TestDetail td1 = new TestDetail();
+        td1.setDetailName("r2");
+        TestDetailSub td2 = new TestDetailSub();
+        td1.setDetailName(td2.getDetailName());
+
+        List<ReflectionUtil.DeepCompareDifference> diffsDetected;
+        diffsDetected = ReflectionUtil.deepCompareViaReadWriteablePropertiesIgnoreTypeDifferences(td1, td2);
+        Assert.assertEquals(diffsDetected.size(), 0);
+
+        td2.setDetailName("d2");
+        diffsDetected = ReflectionUtil.deepCompareViaReadWriteablePropertiesIgnoreTypeDifferences(td1, td2);
+        Assert.assertEquals(diffsDetected.size(), 1);
+
 
     }
 
